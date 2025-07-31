@@ -23,6 +23,15 @@ INDEX_PATH = "omniscient.index"
 META_PATH = "metadata.pkl"
 
 
+# def download_pdf_from_url(url):
+#     response = requests.get(url)
+#     if response.status_code != 200:
+#         raise Exception("Failed to download PDF from URL")
+#     tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
+#     tmp.write(response.content)
+#     tmp.close()
+#     return tmp.name
+
 def download_pdf_from_url(url):
     response = requests.get(url)
     if response.status_code != 200:
@@ -30,7 +39,8 @@ def download_pdf_from_url(url):
     tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
     tmp.write(response.content)
     tmp.close()
-    return tmp.name
+    pdf_path = tmp.name
+    return pdf_path
 
 # def extract_text_from_pdf(pdf_path):
 #     all_text = []
@@ -128,26 +138,55 @@ def search(query, top_k=5):
 #     return rerank_chunks(retrieved_chunks, query_vec)
 
 
-def run_pipeline(url, questions):
-    if not (Path("omniscient.index").exists()):
-        pdf_path = download_pdf_from_url(url)
-        raw_text = extract_text_from_pdf(pdf_path)
-        cleaned_text = clean_text(raw_text)
-        print("Cleaned text : ",cleaned_text)
-        print()
-        print("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++")
-        chunks = chunk_text(cleaned_text)
-        structured_chunks = [
-            {"chunk_id": f"chunk_{i+1}_pg()", "content": chunk} for i, chunk in enumerate(chunks)
-        ]
-        print("structured_chunks : ", structured_chunks)
-        print()
-        print("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++")
-        index = build_faiss_index(structured_chunks)
+# def run_pipeline(url, questions):
+#     if not (Path("omniscient.index").exists()):
+#         pdf_path = download_pdf_from_url(url)
+#         raw_text = extract_text_from_pdf(pdf_path)
+#         cleaned_text = clean_text(raw_text)
+#         print("Cleaned text : ",cleaned_text)
+#         print()
+#         print("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++")
+#         chunks = chunk_text(cleaned_text)
+#         structured_chunks = [
+#             {"chunk_id": f"chunk_{i+1}_pg()", "content": chunk} for i, chunk in enumerate(chunks)
+#         ]
+#         print("structured_chunks : ", structured_chunks)
+#         print()
+#         print("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++")
+#         index = build_faiss_index(structured_chunks)
 
-    answers = []
-    for q in questions:
-        top_chunks = search(q)
-        answer = generate_structured_answer(q, top_chunks)
-        answers.append(answer)
-    return answers
+#     answers = []
+#     for q in questions:
+#         top_chunks = search(q)
+#         answer = generate_structured_answer(q, top_chunks)
+#         answers.append(answer)
+#     return answers
+
+
+
+def run_pipeline(url, questions):
+    index_path = Path("omniscient.index")
+    meta_path = Path("metadata.pkl")
+    pdf_path = None
+    try:
+        if not (index_path.exists() and meta_path.exists()):
+            pdf_path = download_pdf_from_url(url)
+            raw_text = extract_text_from_pdf(pdf_path)
+            cleaned_text = clean_text(raw_text)
+            chunks = chunk_text(cleaned_text)
+            structured_chunks = [
+                {"chunk_id": f"chunk_{i+1}", "content": chunk} for i, chunk in enumerate(chunks)
+            ]
+            index = build_faiss_index(structured_chunks)
+        else:
+            index, metadata = load_index()
+
+        answers = []
+        for q in questions:
+            top_chunks = search(q)
+            answer = generate_structured_answer(q, top_chunks)
+            answers.append(answer)
+        return answers
+    finally:
+        if pdf_path and Path(pdf_path).exists():
+            os.unlink(pdf_path)  # Delete temporary PDF

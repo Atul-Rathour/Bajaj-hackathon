@@ -30,39 +30,76 @@ def generate_structured_answer(question, chunks):
     """
     context_text = "\n---\n".join([f"[{c['chunk_id']}]\n{c['content']}" for c in chunks])
 
+    # prompt = f"""
+    #         You are an expert in analyzing legal, insurance, and compliance policy documents.
+
+    #         Use the chunks provided below to answer the user question as accurately as possible.
+    #         Do NOT use any external knowledge — rely ONLY on the given text.
+
+    #         ---
+    #         Question:
+    #         {question}
+
+    #         Relevant Clauses:
+    #         {context_text}
+    #         ---
+
+    #        Instructions:
+    #         - Extract the answer based only on the chunks.
+    #         - Your answer MUST directly quote or summarize the clause in the chunks.
+    #         - If clause mentions numbers, conditions, or waiting periods, include them exactly.
+    #         - Use **precise legal terms** when available.
+    #         - Add clause IDs like ["chunk_1_pg()", ...] that were most useful.
+    #         - If no answer is found in the chunks, say: "Not found in provided clauses."
+
+    #         Only trust the below clause content. Avoid vague summaries.
+
+    #         ---
+
+    #         Respond in the following JSON format:
+    #         {{
+    #             "question": "...",
+    #             "answer": "...",           // concise and directly answers the question
+    #             "reasoning": "...",        // explain why the chunks support the answer
+    #             "clauses": ["chunk_3_pg_7", "chunk_6_pg_8"]
+    #         }}
+    #     """
+
+
     prompt = f"""
-            You are an expert in analyzing legal, insurance, and compliance policy documents.
+You are an expert in analyzing legal, insurance, and compliance policy documents.
 
-            Use the chunks provided below to answer the user question as accurately as possible.
-            Do NOT use any external knowledge — rely ONLY on the given text.
+Use the chunks provided below to answer the user question as accurately as possible.
+Do NOT use any external knowledge — rely ONLY on the given text.
 
-            ---
-            Question:
-            {question}
+---
+Question:
+{question}
 
-            Relevant Clauses:
-            {context_text}
-            ---
+Relevant Clauses:
+{context_text}
+---
 
-           Instructions:
-            - Extract the answer based only on the chunks.
-            - Avoid speculation or generic responses.
-            - Use exact terms, clause language, or limits (like days, months, ₹ values) mentioned.
-            - If the answer depends on conditions (e.g., eligibility period, age, continuous coverage), clearly mention **all** such conditions.
-            - Mention the clause IDs (chunk_X_pg_Y) that support your answer.
-            - Keep the answer concise, factual, and easy to verify.
-            - Your goal is to maximize alignment with the expected ground truth.
-            ---
+Instructions:
+- Extract the answer based only on the chunks.
+- Your answer MUST directly quote or summarize the clause in the chunks.
+- If clause mentions numbers, conditions, or waiting periods, include them exactly.
+- Use **precise legal terms** when available.
+- Add clause IDs like ["chunk_1_pg()", ...] that were most useful.
+- If no answer is found in the chunks, say: "Not found in provided clauses."
 
-            Respond in the following JSON format:
-            {{
-            "question": "...",
-            "answer": "...",           // concise and directly answers the question
-            "reasoning": "...",        // explain why the chunks support the answer
-            "clauses": ["chunk_3_pg_7", "chunk_6_pg_8"]
-            }}
-        """
+Only trust the below clause content. Avoid vague summaries.
 
+---
+
+Respond in the following JSON format:
+{{
+    "question": "{question}",
+    "answer": "...",
+    "reasoning": "...",
+    "clauses": ["chunk_3_pg_7", "chunk_6_pg_8"]
+}}
+"""
 
     response = client.chat.completions.create(
         model=MODEL_NAME,
